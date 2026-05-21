@@ -1,18 +1,34 @@
-name: Check patch series correctness
+name: Lint
 
-on: [push, pull_request]
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
   lint:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
-      with:
-        submodules: true
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.14'
-    - run: ./helium-chromium/devutils/lint.py -t .
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: true
+
+      - name: Check shell scripts
+        run: bash -n scripts/*.sh
+
+      - name: Validate patch metadata
+        run: ./helium-chromium/devutils/lint.py -t .
+
+      - name: Smoke-test overlay injection
+        shell: bash
+        run: |
+          checkout="$(bash scripts/prepare-platform.sh --skip-submodules linux /tmp/helium-passwords-linux-smoke)"
+          grep -qx 'helium/passwords/restore-password-autofill.patch' "$checkout/patches/series"
+          grep -qx 'helium/passwords/restore-password-ui.patch' "$checkout/patches/series"
+          test -f "$checkout/patches/helium/passwords/restore-password-autofill.patch"

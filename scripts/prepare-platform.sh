@@ -1,0 +1,121 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    cat >&2 <<'EOF'
+usage: scripts/prepare-platform.sh [--skip-submodules] <linux|macos|windows> [destination]
+
+Clone the official Helium platform repo, remove the upstream password-disable
+patch from helium-chromium, and append this repo's password overlay patches to
+the platform patch series.
+EOF
+}
+
+root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd)"
+# shellcheck source=../helium-passwords.conf
+. "${root_dir}/helium-passwords.conf"
+
+skip_submodules=false
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --skip-submodules)
+            skip_submodules=true
+            shift
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            usage
+            exit 2
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+platform="${1:-}"
+if [ -z "${platform}" ]; then
+    usage
+    exit 2
+fi
+shift || true
+
+case "${platform}" in
+    linux) repo_url="${HELIUM_LINUX_REPO}" ;;
+    macos) repo_url="${HELIUM_MACOS_REPO}" ;;
+    windows) repo_url="${HELIUM_WINDOWS_REPO}" ;;
+    *)
+        echo "unknown platform: ${platform}" >&2
+        usage
+        exit 2
+        ;;
+esac
+
+destination="${1:-${root_dir}/${HELIUM_WORK_DIR}/${platform}}"
+mkdir -p "$(dirname "${destination}")"
+
+if [ ! -d "${destination}/.git" ]; then
+    git clone --depth 1 --branch "${HELIUM_PLATFORM_REF}" "${repo_url}" "${destination}" >&2
+else
+    echo "using existing platform checkout: ${destination}" >&2
+fi
+
+if [ "${skip_submodules}" != true ]; then
+    git -C "${destination}" submodule update --init --recursive helium-chromium >&2
+fi
+
+core_series="${destination}/helium-chromium/patches/series"
+if [ -f "${core_series}" ]; then
+    tmp_series="$(mktemp)"
+    awk '$0 != "helium/hop/disable-password-manager.patch" { print }' \
+        "${core_series}" > "${tmp_series}"
+    mv "${tmp_series}" "${core_series}"
+elif [ "${skip_submodules}" != true ]; then
+    echo "missing core patch series: ${core_series}" >&2
+    exit 1
+fi
+
+platform_series="${destination}/patches/series"
+if [ ! -f "${platform_series}" ]; then
+    echo "missing platform patch series: ${platform_series}" >&2
+    exit 1
+fi
+
+overlay_dir="${destination}/patches/helium/passwords"
+rm -rf "${overlay_dir}"
+mkdir -p "${overlay_dir}"
+
+overlay_entries=()
+while IFS= read -r patch_path; do
+    case "${patch_path}" in
+        ""|\#*) continue ;;
+    esac
+
+    source_patch="${root_dir}/patches/${patch_path}"
+    if [ ! -f "${source_patch}" ]; then
+        echo "missing overlay patch: ${source_patch}" >&2
+        exit 1
+    fi
+
+    patch_name="$(basename "${patch_path}")"
+    cp "${source_patch}" "${overlay_dir}/${patch_name}"
+    overlay_entries+=("helium/passwords/${patch_name}")
+done < "${root_dir}/patches/series"
+
+tmp_series="$(mktemp)"
+awk '$0 !~ /^helium\/passwords\//' "${platform_series}" > "${tmp_series}"
+{
+    cat "${tmp_series}"
+    printf '\n'
+    printf '%s\n' "${overlay_entries[@]}"
+} > "${platform_series}"
+rm -f "${tmp_series}"
+
+echo "${destination}"

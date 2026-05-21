@@ -1,15 +1,2 @@
-ungoogled-chromium/portablelinux/drop-nodejs-version-check.patch
-ungoogled-chromium/portablelinux/use-oauth2-client-switches-as-default.patch
-ungoogled-chromium/portablelinux/fix-compiling-on-arm64.patch
-
-helium/linux/change-chromium-branding.patch
-helium/linux/rename-chrome-binary.patch
-helium/linux/use-default-theme.patch
-helium/linux/fix-swipe-between-pages.patch
-helium/linux/add-middle-click-paste-flag.patch
-helium/linux/disable-ctrl-shift-c-and-tab-detach.patch
-helium/linux/add-error-for-missing-desktop-file.patch
-helium/linux/disable-tab-strokes.patch
-helium/linux/restore-password-autofill.patch
-helium/linux/restore-password-ui.patch
-helium/linux/lighten-selected-tabs.patch
+helium-passwords/restore-password-autofill.patch
+helium-passwords/restore-password-ui.patch

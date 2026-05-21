@@ -1,47 +1,142 @@
-name: Build Linux AppImage for Helium
+name: Build Helium Passwords
+
 on:
   push:
     branches:
       - main
   workflow_dispatch:
     inputs:
-      runner:
+      platform:
+        description: Platform to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - linux
+          - macos
+          - windows
+      arch:
+        description: Architecture to build
+        required: true
+        type: choice
+        default: all
+        options:
+          - all
+          - x86_64
+          - arm64
+      platform-ref:
+        description: Branch or tag to clone from platform repos
         required: false
-        description: "Runner image to use"
-        default: "ubuntu-latest"
-      do-release:
-        required: false
-        type: boolean
-        description: "Create a release after build is done"
-        default: false
+        type: string
+        default: main
 
 concurrency:
-  group: helium-linux-build
+  group: helium-passwords-build-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   build:
-    name: Build Helium binaries and AppImage
-    uses: ./.github/workflows/build-steps.yml
-    secrets: inherit
-    with:
-      arch: x86_64
-      runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
-
-  release:
-    name: Create release
-    runs-on: ubuntu-latest
-    needs: build
-    if: ${{ inputs.do-release == true }}
+    name: ${{ matrix.platform }} ${{ matrix.arch }}
+    timeout-minutes: 360
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux
+            arch: x86_64
+            runner: ubuntu-24.04
+          - platform: linux
+            arch: arm64
+            runner: ubuntu-24.04-arm
+          - platform: macos
+            arch: x86_64
+            runner: macos-15-intel
+          - platform: macos
+            arch: arm64
+            runner: macos-15
+          - platform: windows
+            arch: x86_64
+            runner: windows-2025
+          - platform: windows
+            arch: arm64
+            runner: windows-2025
+    runs-on: ${{ matrix.runner }}
+    env:
+      HELIUM_PLATFORM_REF: ${{ github.event_name == 'workflow_dispatch' && inputs['platform-ref'] || 'main' }}
+      TARGET_SELECTED: >-
+        ${{
+          github.event_name != 'workflow_dispatch' ||
+          ((inputs.platform == 'all' || inputs.platform == matrix.platform) &&
+           (inputs.arch == 'all' || inputs.arch == matrix.arch))
+        }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Skip unselected target
+        if: env.TARGET_SELECTED != 'true'
+        run: echo "Skipping ${{ matrix.platform }} ${{ matrix.arch }}"
+
+      - name: Checkout
+        if: env.TARGET_SELECTED == 'true'
+        uses: actions/checkout@v6
         with:
           submodules: true
-          fetch-depth: 0
-          fetch-tags: true
-      - uses: ./.github/actions/release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        if: env.TARGET_SELECTED == 'true' && matrix.platform != 'windows'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+
+      - name: Set up Python for Windows
+        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'windows'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Set up Docker Buildx
+        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'linux'
+        uses: docker/setup-buildx-action@v4
+
+      - name: Free Linux runner space
+        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'linux'
+        shell: bash
+        run: |
+          sudo rm -rf /usr/local/lib/android \
+            /usr/local/.ghcup \
+            /usr/lib/jvm \
+            /usr/lib/google-cloud-sdk \
+            /usr/lib/dotnet \
+            /usr/share/swift
+
+      - name: Prepare macOS host
+        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'macos'
+        shell: bash
+        run: |
+          sudo rm -rf "${ANDROID_HOME:-}" || true
+          sudo mdutil -a -i off || true
+
+      - name: Enable long Windows paths
+        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'windows'
+        shell: pwsh
+        run: git config --system core.longpaths true
+
+      - name: Build
+        if: env.TARGET_SELECTED == 'true'
+        shell: bash
+        run: bash scripts/build.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
+
+      - name: Upload artifacts
+        if: env.TARGET_SELECTED == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: helium-passwords-${{ matrix.platform }}-${{ matrix.arch }}
+          path: |
+            build/platforms/${{ matrix.platform }}/build/helium*
+            build/platforms/${{ matrix.platform }}/build/*.dmg
+            build/platforms/${{ matrix.platform }}/build/release/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 7
