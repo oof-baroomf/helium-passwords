@@ -94,6 +94,7 @@ mkdir -p "${overlay_dir}"
 
 overlay_entries=()
 while IFS= read -r patch_path; do
+    patch_path="${patch_path%$'\r'}"
     case "${patch_path}" in
         ""|\#*) continue ;;
     esac
