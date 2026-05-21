@@ -41,7 +41,7 @@ case "${platform}" in
         if [ "${HELIUM_USE_PGO:-0}" = "1" ]; then
             build_args+=(--pgo)
         fi
-        (cd "${checkout}" && ARCH="${arch}" bash scripts/docker-build.sh "${build_args[@]}")
+        (cd "${checkout}" && env -u CI ARCH="${arch}" bash scripts/docker-build.sh "${build_args[@]}")
         (cd "${checkout}" && bash scripts/package.sh)
         ;;
     macos)
