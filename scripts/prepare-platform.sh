@@ -88,6 +88,15 @@ if [ ! -f "${platform_series}" ]; then
     exit 1
 fi
 
+if [ "${platform}" = "linux" ]; then
+    rust_arm64_patch="${destination}/patches/ungoogled-chromium/portablelinux/fix-compiling-on-arm64.patch"
+    if [ -f "${rust_arm64_patch}" ]; then
+        sed -i \
+            's/GetLibXml2Dirs, GetHostSysrootPlatform,/GetLibXml2Dirs, GitCherryPick, GetHostSysrootPlatform,/' \
+            "${rust_arm64_patch}"
+    fi
+fi
+
 overlay_dir="${destination}/patches/helium/passwords"
 rm -rf "${overlay_dir}"
 mkdir -p "${overlay_dir}"

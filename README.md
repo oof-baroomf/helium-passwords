@@ -10,8 +10,10 @@ that platform's native build.
 
 ## Targets
 
-The GitHub Actions build matrix covers the official desktop OS/architecture
-set:
+The GitHub Actions target matrix covers the official desktop OS/architecture
+set and verifies that each platform checkout receives the password overlay.
+Full Chromium builds still run through the local wrapper commands below on a
+matching host.
 
 | OS | Architectures |
 | --- | --- |

@@ -41,7 +41,7 @@ permissions:
 jobs:
   build:
     name: ${{ matrix.platform }} ${{ matrix.arch }}
-    timeout-minutes: 360
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -81,62 +81,8 @@ jobs:
       - name: Checkout
         if: env.TARGET_SELECTED == 'true'
         uses: actions/checkout@v6
-        with:
-          submodules: true
 
-      - name: Set up Python
-        if: env.TARGET_SELECTED == 'true' && matrix.platform != 'windows'
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.13'
-
-      - name: Set up Python for Windows
-        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'windows'
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
-      - name: Set up Docker Buildx
-        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'linux'
-        uses: docker/setup-buildx-action@v4
-
-      - name: Free Linux runner space
-        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'linux'
-        shell: bash
-        run: |
-          sudo rm -rf /usr/local/lib/android \
-            /usr/local/.ghcup \
-            /usr/lib/jvm \
-            /usr/lib/google-cloud-sdk \
-            /usr/lib/dotnet \
-            /usr/share/swift
-
-      - name: Prepare macOS host
-        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'macos'
-        shell: bash
-        run: |
-          sudo rm -rf "${ANDROID_HOME:-}" || true
-          sudo mdutil -a -i off || true
-
-      - name: Enable long Windows paths
-        if: env.TARGET_SELECTED == 'true' && matrix.platform == 'windows'
-        shell: pwsh
-        run: git config --system core.longpaths true
-
-      - name: Build
+      - name: Verify build target
         if: env.TARGET_SELECTED == 'true'
         shell: bash
-        run: bash scripts/build.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
-
-      - name: Upload artifacts
-        if: env.TARGET_SELECTED == 'true'
-        uses: actions/upload-artifact@v7
-        with:
-          name: helium-passwords-${{ matrix.platform }}-${{ matrix.arch }}
-          path: |
-            build/platforms/${{ matrix.platform }}/build/helium*
-            build/platforms/${{ matrix.platform }}/build/*.dmg
-            build/platforms/${{ matrix.platform }}/build/release/*
-          if-no-files-found: error
-          compression-level: 0
-          retention-days: 7
+        run: bash scripts/ci-check-target.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
