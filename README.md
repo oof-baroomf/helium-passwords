@@ -11,9 +11,10 @@ that platform's native build.
 ## Targets
 
 The GitHub Actions target matrix covers the official desktop OS/architecture
-set and verifies that each platform checkout receives the password overlay.
-Full Chromium builds still run through the local wrapper commands below on a
-matching host.
+set and verifies that each platform checkout receives the password and payment
+overlay. Full Chromium builds still run through the local wrapper commands
+below on a matching host, or by dispatching the build workflow with
+`run-build` enabled.
 
 | OS | Architectures |
 | --- | --- |
@@ -38,6 +39,12 @@ bash scripts/build.sh windows arm64
 The wrapper clones platform repos under `build/platforms/` by default. Override
 repo URLs, clone ref, or the work directory in `helium-passwords.conf` or by
 exporting the same variables before running a script.
+
+## Releases
+
+Dispatch **Build Helium Passwords** with `create-release` enabled to run the
+selected full build, upload its packaged artifacts, and publish a prerelease.
+Leave `release-tag` blank to use the built Helium version.
 
 ## Patch Flow
 

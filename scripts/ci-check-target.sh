@@ -50,6 +50,17 @@ cmp -s "${root_dir}/patches/helium-passwords/restore-password-autofill.patch" \
 cmp -s "${root_dir}/patches/helium-passwords/restore-password-ui.patch" \
     "${checkout}/patches/helium/passwords/restore-password-ui.patch"
 
+grep -q 'r.PAYMENTS = r.AUTOFILL.createChild' \
+    "${checkout}/patches/helium/passwords/restore-password-autofill.patch"
+grep -q 'chrome::ShowPaymentMethods' \
+    "${checkout}/patches/helium/passwords/restore-password-ui.patch"
+grep -q 'kActionShowPaymentsBubbleOrPage' \
+    "${checkout}/patches/helium/passwords/restore-password-ui.patch"
+grep -q 'PageActionIconType::kVirtualCardEnroll' \
+    "${checkout}/patches/helium/passwords/restore-password-ui.patch"
+grep -q 'PageActionIconType::kMandatoryReauth' \
+    "${checkout}/patches/helium/passwords/restore-password-ui.patch"
+
 if [ "${platform}" = "linux" ]; then
     grep -q 'GetLibXml2Dirs, GitCherryPick, GetHostSysrootPlatform,' \
         "${checkout}/patches/ungoogled-chromium/portablelinux/fix-compiling-on-arm64.patch"
